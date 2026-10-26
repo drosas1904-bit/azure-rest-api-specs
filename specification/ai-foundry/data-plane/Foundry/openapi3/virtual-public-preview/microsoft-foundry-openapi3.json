@@ -3550,7 +3550,7 @@
             "name": "store",
             "in": "query",
             "required": false,
-            "description": "Whether to persist the conversation created by this WebSocket session. If omitted, the service honors the\npersisted voice agent definition's configured `store` value. If supplied, this value overrides the\ndefinition's `store` setting for this session only.",
+            "description": "Whether to persist the conversation created by this WebSocket session. If omitted, the service honors the\npersisted voice agent definition's configured `store` value. If supplied, this value overrides the\ndefinition's `store` setting for this session only. A `false` override does not prevent persistence when\nthe selected agent version's `post_call.include` requests `audio`: the conversation and its audio are\nstill persisted so that the post-call recording reference can be served.",
             "schema": {
               "type": "boolean"
             },
@@ -3639,7 +3639,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_listAgentConversations",
         "summary": "List voice agent conversations",
-        "description": "Returns the conversations persisted for the specified voice agent endpoint.\nConversations are present when the session's effective `store` setting is `true`, whether inherited from the\nagent definition or enabled by the WebSocket session override.",
+        "description": "Returns the conversations persisted for the specified voice agent endpoint.\nConversations are present when the session's effective `store` setting is `true`, whether inherited from the\nagent definition or enabled by the WebSocket session override, or when the selected agent version's\n`post_call.include` requests `audio`, even if the effective `store` setting is `false`.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -3787,7 +3787,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_getAgentConversation",
         "summary": "Get a voice agent conversation",
-        "description": "Retrieves a single conversation recorded for the specified voice agent endpoint by its id.\nReturns `404` when the conversation was not persisted (`store = false`) or does not exist.",
+        "description": "Retrieves a single conversation recorded for the specified voice agent endpoint by its id.\nReturns `404` when the conversation was not persisted or does not exist.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -3956,7 +3956,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_getAgentConversationAudio",
         "summary": "Get a voice agent conversation's merged recording metadata",
-        "description": "Returns metadata for the whole-call merged stereo recording (user audio on the left channel, agent audio\non the right). The common metadata (format, sample rate, channels, channel layout, duration) is returned\nfor both Foundry-managed and bring-your-own-storage (BYOS) recordings; for BYOS the response additionally\nincludes `blob_uri`, the URI of the recording in the customer's own storage (no SAS) that the customer downloads\nwith their own credentials. The recording is built once from the per-turn segments after persistence\nfinalization succeeds. While the conversation is `in_progress`, this route returns retriable `409 Conflict`\nwith `error.code = recording_not_ready` and a `Retry-After` header when retry guidance is available. When the\nconversation is `failed`, it returns terminal `409 Conflict` with `error.code = recording_unavailable`.\nFor a `completed` conversation, metadata is available subject to the existing BYOS behavior. Requires the\nconversation to have persisted audio (`store = true`); otherwise returns `404`.",
+        "description": "Returns metadata for the whole-call merged stereo recording (user audio on the left channel, agent audio\non the right). The common metadata (format, sample rate, channels, channel layout, duration) is returned\nfor both Foundry-managed and bring-your-own-storage (BYOS) recordings; for BYOS the response additionally\nincludes `blob_uri`, the URI of the recording in the customer's own storage (no SAS) that the customer downloads\nwith their own credentials. The recording is built once from the per-turn segments after persistence\nfinalization succeeds. While the conversation is `in_progress`, this route returns retriable `409 Conflict`\nwith `error.code = recording_not_ready` and a `Retry-After` header when retry guidance is available. When the\nconversation is `failed`, it returns terminal `409 Conflict` with `error.code = recording_unavailable`.\nFor a `completed` conversation, metadata is available subject to the existing BYOS behavior. Requires the\nconversation to have persisted audio (effective `store = true`, or a post-call `audio` request); otherwise\nreturns `404`.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -4045,7 +4045,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_getAgentConversationAudioContent",
         "summary": "Stream a voice agent conversation's merged recording",
-        "description": "Streams the whole-call merged stereo recording as a WAV (`audio/wav`) byte stream through the service\n(no SAS URL). This route serves Foundry-managed storage only. For bring-your-own-storage (BYOS)\nrecordings the bytes are not proxied — the caller must download directly from customer storage using the\n`blob_uri` returned by the metadata route — so this route returns `409 Conflict` for BYOS recordings.\nWhile the conversation is `in_progress`, this route returns retriable `409 Conflict` with\n`error.code = recording_not_ready` and a `Retry-After` header when retry guidance is available. When the\nconversation is `failed`, it returns terminal `409 Conflict` with `error.code = recording_unavailable`.\nFor a `completed` conversation, content is available subject to the existing BYOS behavior. A conversation\nwithout persisted audio (`store = false`) returns `404`.",
+        "description": "Streams the whole-call merged stereo recording as a WAV (`audio/wav`) byte stream through the service\n(no SAS URL). This route serves Foundry-managed storage only. For bring-your-own-storage (BYOS)\nrecordings the bytes are not proxied — the caller must download directly from customer storage using the\n`blob_uri` returned by the metadata route — so this route returns `409 Conflict` for BYOS recordings.\nWhile the conversation is `in_progress`, this route returns retriable `409 Conflict` with\n`error.code = recording_not_ready` and a `Retry-After` header when retry guidance is available. When the\nconversation is `failed`, it returns terminal `409 Conflict` with `error.code = recording_unavailable`.\nFor a `completed` conversation, content is available subject to the existing BYOS behavior. A conversation\nwithout persisted audio (effective `store = false` and no post-call `audio` request) returns `404`.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -4134,7 +4134,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_listAgentConversationItems",
         "summary": "List items in a voice agent conversation",
-        "description": "Returns a paged collection of items — the complete ordered conversation history, including user input,\nassistant output, and client-created tool outputs (transcripts + tool events). Returns `404` when the\nconversation was not persisted (`store = false`).",
+        "description": "Returns a paged collection of items — the complete ordered conversation history, including user input,\nassistant output, and client-created tool outputs (transcripts + tool events). Returns `404` when the\nconversation was not persisted.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -4291,7 +4291,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_getAgentConversationItem",
         "summary": "Get a voice agent conversation item",
-        "description": "Retrieves a single item from the specified conversation by its id, including its transcript. An\n`input_audio`/`output_audio` content part indicates that audio is available for the item; the canonical per-item\naudio metadata is the `/items/{item_id}/audio` resource, and the bytes are streamed by\n`/items/{item_id}/audio/content`. Returns `404` when the conversation or item was not persisted\n(`store = false`).",
+        "description": "Retrieves a single item from the specified conversation by its id, including its transcript. An\n`input_audio`/`output_audio` content part indicates that audio is available for the item; the canonical per-item\naudio metadata is the `/items/{item_id}/audio` resource, and the bytes are streamed by\n`/items/{item_id}/audio/content`. Returns `404` when the conversation or item was not persisted.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -4389,7 +4389,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_getAgentConversationAudioItem",
         "summary": "Get a voice agent conversation item's audio metadata",
-        "description": "Returns metadata for a single conversation item's audio segment, including the common playback facts\n(role, format/codec, sample rate, channels, offset, duration) for both Foundry-managed and\nbring-your-own-storage (BYOS) recordings; for BYOS the response additionally includes `blob_uri`, the URI\nof the recording in the customer's own storage (no SAS) that the customer downloads with their own credentials.\nRequires the conversation to have persisted audio (`store = true`); returns `404` when the conversation,\nitem, or its audio was not persisted.",
+        "description": "Returns metadata for a single conversation item's audio segment, including the common playback facts\n(role, format/codec, sample rate, channels, offset, duration) for both Foundry-managed and\nbring-your-own-storage (BYOS) recordings; for BYOS the response additionally includes `blob_uri`, the URI\nof the recording in the customer's own storage (no SAS) that the customer downloads with their own credentials.\nRequires the conversation to have persisted audio (effective `store = true`, or a post-call `audio` request);\nreturns `404` when the conversation, item, or its audio was not persisted.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -4487,7 +4487,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_getAgentConversationAudioItemContent",
         "summary": "Stream a voice agent conversation item's audio",
-        "description": "Streams a single conversation item's audio as a WAV (`audio/wav`) byte stream through the service (no SAS\nURL). This route serves Foundry-managed storage only. For bring-your-own-storage (BYOS) recordings the\nbytes are not proxied — the caller must download directly from customer storage using the `blob_uri`\nreturned by the item's `/audio` metadata route — so this route returns `409 Conflict` for BYOS recordings.\nReturns `404` when the conversation, item, or its audio was not persisted (`store = false`).",
+        "description": "Streams a single conversation item's audio as a WAV (`audio/wav`) byte stream through the service (no SAS\nURL). This route serves Foundry-managed storage only. For bring-your-own-storage (BYOS) recordings the\nbytes are not proxied — the caller must download directly from customer storage using the `blob_uri`\nreturned by the item's `/audio` metadata route — so this route returns `409 Conflict` for BYOS recordings.\nReturns `404` when the conversation, item, or its audio was not persisted.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -4781,7 +4781,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_listAgentConversationResponses",
         "summary": "List responses in a voice agent conversation",
-        "description": "Returns a paged collection of the responses (model inference turns) recorded for the specified\nconversation. The per-response `output` projection may be omitted here; use the response-items route\nfor the canonical paged output. Returns `404` when the conversation was not persisted (`store = false`).",
+        "description": "Returns a paged collection of the responses (model inference turns) recorded for the specified\nconversation. The per-response `output` projection may be omitted here; use the response-items route\nfor the canonical paged output. Returns `404` when the conversation was not persisted.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -4938,7 +4938,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_getAgentConversationResponse",
         "summary": "Get a voice agent conversation response",
-        "description": "Retrieves a single response from the specified conversation by its id, including its `output` items,\n`usage`, and status. Returns `404` when the conversation or response was not persisted (`store = false`).",
+        "description": "Retrieves a single response from the specified conversation by its id, including its `output` items,\n`usage`, and status. Returns `404` when the conversation or response was not persisted.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -5036,7 +5036,7 @@
       "get": {
         "operationId": "AgentEndpointConversations_listAgentConversationResponseItems",
         "summary": "List items produced by a voice agent conversation response",
-        "description": "Returns a paged collection of the output items produced by a specific response (the response's output\nprojection). For the complete ordered conversation history — including user input and client-created\ntool outputs — use the conversation items route instead. Returns `404` when the conversation or\nresponse was not persisted (`store = false`).",
+        "description": "Returns a paged collection of the output items produced by a specific response (the response's output\nprojection). For the complete ordered conversation history — including user input and client-created\ntool outputs — use the conversation items route instead. Returns `404` when the conversation or\nresponse was not persisted.",
         "parameters": [
           {
             "name": "Foundry-Features",
@@ -100553,9 +100553,25 @@
             "$ref": "#/components/schemas/VoiceAgentSubagentConfig",
             "description": "Optional configuration for sibling Foundry text agents that this voice agent may consult as background specialists."
           },
+          "post_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceAgentPostCall"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional post-call destinations and content selection stored with this immutable agent version. Omit this\nproperty or set it to null when creating or replacing a complete definition to leave that version without post-call configuration;\nearlier versions are unchanged.\nSaving the configuration does not send events or dispatch routines. The service validates that the selected\nvoice-agent definition and requested content are supported; unsupported content requests fail explicitly.",
+            "x-ms-foundry-meta": {
+              "required_previews": [
+                "VoiceAgents=V1Preview"
+              ]
+            }
+          },
           "store": {
             "type": "boolean",
-            "description": "Whether conversations with this agent are persisted. A single, all-or-nothing persistence switch that defaults to\n`false` (privacy-safe: off by default). When `true`, Foundry persists the full conversation — the transcript/event\ntimeline and raw audio. When `false`, nothing is persisted and no conversation is surfaced. There is no separate\naudio-logging control; audio is persisted only as part of this switch. Latency/performance telemetry (e.g.\ntime-to-first-audio, inter-token latency, interruption) is observability-only (customer trace / App Insights) and\nis not part of the persisted conversation content.",
+            "description": "Whether conversations with this agent are persisted. A single, all-or-nothing persistence switch that defaults to\n`false` (privacy-safe: off by default). When `true`, Foundry persists the full conversation — the transcript/event\ntimeline and raw audio. When `false`, nothing is persisted and no conversation is surfaced, unless\n`post_call.include` requests `audio`: that request persists the conversation and its audio even when `store` is\n`false`, including when a WebSocket session overrides `store` to `false`. There is no separate audio-logging\ncontrol. Latency/performance telemetry (e.g.\ntime-to-first-audio, inter-token latency, interruption) is observability-only (customer trace / App Insights) and\nis not part of the persisted conversation content.",
             "default": false
           }
         },
@@ -100708,6 +100724,41 @@
           }
         ],
         "description": "The sensitivity threshold for semantic end-of-utterance detection.",
+        "x-ms-foundry-meta": {
+          "required_previews": [
+            "VoiceAgents=V1Preview"
+          ]
+        }
+      },
+      "VoiceAgentEventGridPostCallDestination": {
+        "type": "object",
+        "required": [
+          "type",
+          "connection_name"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "event_grid"
+            ],
+            "description": "Selects an Event Grid connection destination."
+          },
+          "connection_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The nonblank bare name of the Event Grid connection in the same project. The connection stores the endpoint\nand authentication settings. The service rejects whitespace, URLs, and resource paths.",
+            "examples": [
+              "post-call-events"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/VoiceAgentPostCallDestination"
+          }
+        ],
+        "description": "An Event Grid connection in the same project that receives post-call events.",
         "x-ms-foundry-meta": {
           "required_previews": [
             "VoiceAgents=V1Preview"
@@ -101198,6 +101249,100 @@
           ]
         }
       },
+      "VoiceAgentPostCall": {
+        "type": "object",
+        "required": [
+          "destinations"
+        ],
+        "properties": {
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VoiceAgentPostCallDestination"
+            },
+            "minItems": 1,
+            "maxItems": 10,
+            "description": "One to ten destinations in total, in any combination of Event Grid connections and routines. Multiple\ndestinations of either type are allowed. List order does not define execution order. The service rejects\nduplicate references to the same destination rather than silently deduplicating them; Routine names use\nordinal, case-sensitive comparison."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VoiceAgentPostCallIncludeOption"
+            },
+            "description": "Content requested for every destination. Omission defaults to [\"transcript\"]; an empty list requests no\ncontent but still triggers delivery of basic event, session, and quality metadata to every destination.\nOnly \"transcript\" and \"audio\" are supported. The service rejects repeated values. List order has no meaning.\nThe list selects content, not event types or payload formats. Schema defaults alone do not implement\nservice behavior. Delivery must distinguish content not requested from requested content that is unavailable.\nTranscript uses standard conversation items, including tool calls and results. Audio requests an authorized\nURL reference to the call's merged recording, not inline or base64 audio. Requesting audio persists the\nsession's conversation and audio even when store is false, including a WebSocket store=false override, because\nthe recording is served from the stored conversation; it is then readable through the conversation routes and\nfollows the conversation's retention and deletion.",
+            "default": [
+              "transcript"
+            ]
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        },
+        "description": "Post-call destinations and content selection for a voice agent version. After an observable session end, the\nservice attempts all destinations independently and concurrently on a best-effort basis, sharing one captured\nsnapshot and an overall deadline. One destination's failure does not prevent attempts to the others.\nDelivery is not guaranteed after a hard crash and is not exactly once.",
+        "x-ms-foundry-meta": {
+          "required_previews": [
+            "VoiceAgents=V1Preview"
+          ]
+        }
+      },
+      "VoiceAgentPostCallDestination": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/VoiceAgentPostCallDestinationType",
+            "description": "The destination type."
+          }
+        },
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "event_grid": "#/components/schemas/VoiceAgentEventGridPostCallDestination",
+            "routine": "#/components/schemas/VoiceAgentRoutinePostCallDestination"
+          }
+        },
+        "description": "A post-call destination selected by its type. Each destination references a same-project resource by bare name.",
+        "x-ms-foundry-meta": {
+          "required_previews": [
+            "VoiceAgents=V1Preview"
+          ]
+        }
+      },
+      "VoiceAgentPostCallDestinationType": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "string",
+            "enum": [
+              "event_grid",
+              "routine"
+            ]
+          }
+        ],
+        "description": "The type of a post-call destination. Only Event Grid and Routine destinations are supported; the service rejects\nany other value.",
+        "x-ms-foundry-meta": {
+          "required_previews": [
+            "VoiceAgents=V1Preview"
+          ]
+        }
+      },
+      "VoiceAgentPostCallIncludeOption": {
+        "type": "string",
+        "enum": [
+          "transcript",
+          "audio"
+        ],
+        "description": "Content that may be requested for post-call delivery. Only transcript conversation items and authorized recording URL references are supported by this contract.",
+        "x-ms-foundry-meta": {
+          "required_previews": [
+            "VoiceAgents=V1Preview"
+          ]
+        }
+      },
       "VoiceAgentProfanityFilterMode": {
         "anyOf": [
           {
@@ -101213,6 +101358,42 @@
           }
         ],
         "description": "The supported input-transcript profanity filtering modes.",
+        "x-ms-foundry-meta": {
+          "required_previews": [
+            "VoiceAgents=V1Preview"
+          ]
+        }
+      },
+      "VoiceAgentRoutinePostCallDestination": {
+        "type": "object",
+        "required": [
+          "type",
+          "name"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "routine"
+            ],
+            "description": "Selects a Routine destination."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The nonempty bare Routine name, limited to 128 characters. Names use ordinal, case-sensitive comparison.\nThe service rejects whitespace, URLs, resource paths, the names \".\" and \"..\", and the forward slash,\nbackslash, colon, question mark, number sign, and percent sign characters. Unicode names are allowed. Only the\nname is stored, not a version, endpoint, or credentials.",
+            "examples": [
+              "archive"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/VoiceAgentPostCallDestination"
+          }
+        ],
+        "description": "A Routine in the same project, resolved from the versioned Routine definitions at post-call dispatch. This reference does not pin a Routine version or override its input.",
         "x-ms-foundry-meta": {
           "required_previews": [
             "VoiceAgents=V1Preview"

@@ -86,7 +86,9 @@ interface VoiceAgentWebSocket {
       /**
        * Whether to persist the conversation created by this WebSocket session. If omitted, the service honors the
        * persisted voice agent definition's configured `store` value. If supplied, this value overrides the
-       * definition's `store` setting for this session only.
+       * definition's `store` setting for this session only. A `false` override does not prevent persistence when
+       * the selected agent version's `post_call.include` requests `audio`: the conversation and its audio are
+       * still persisted so that the post-call recording reference can be served.
        */
       @query store?: boolean;
 
@@ -114,9 +116,11 @@ interface VoiceAgentWebSocket {
  * metrics, and audio recorded by a voice agent. For a `voice` agent, the service is the sole writer of
  * responses and items, so only
  * reads plus a cascading conversation delete are exposed — there are no response/item create, update, or
- * delete routes. All persistence is governed by the definition's `store` flag: when `store = false` (the
- * default) nothing is persisted, so these routes return `404`. The merged-recording routes additionally
- * require the session to have ended and return `409` while it is still in progress.
+ * delete routes. A session's conversation, including its audio, is persisted when the session's effective `store`
+ * setting is `true` (inherited from the definition or set by the WebSocket `store` override), or when the selected
+ * agent version's `post_call.include` requests `audio`, regardless of `store`. Otherwise nothing is persisted, so
+ * these routes return `404`. The merged-recording routes additionally require the session to have ended and
+ * return `409` while it is still in progress.
  */
 #suppress "@azure-tools/typespec-azure-core/use-standard-operations" "The endpoint-scoped, read-only voice conversation projection and its nested response, item, and audio routes do not match a standard resource operation template."
 @tag("Agent Conversations")
@@ -124,7 +128,8 @@ interface AgentEndpointConversations {
   /**
    * Returns the conversations persisted for the specified voice agent endpoint.
    * Conversations are present when the session's effective `store` setting is `true`, whether inherited from the
-   * agent definition or enabled by the WebSocket session override.
+   * agent definition or enabled by the WebSocket session override, or when the selected agent version's
+   * `post_call.include` requests `audio`, even if the effective `store` setting is `false`.
    */
   @summary("List voice agent conversations")
   @get
@@ -144,7 +149,7 @@ interface AgentEndpointConversations {
 
   /**
    * Retrieves a single conversation recorded for the specified voice agent endpoint by its id.
-   * Returns `404` when the conversation was not persisted (`store = false`) or does not exist.
+   * Returns `404` when the conversation was not persisted or does not exist.
    */
   @summary("Get a voice agent conversation")
   @get
@@ -185,7 +190,7 @@ interface AgentEndpointConversations {
   /**
    * Returns a paged collection of the responses (model inference turns) recorded for the specified
    * conversation. The per-response `output` projection may be omitted here; use the response-items route
-   * for the canonical paged output. Returns `404` when the conversation was not persisted (`store = false`).
+   * for the canonical paged output. Returns `404` when the conversation was not persisted.
    */
   @summary("List responses in a voice agent conversation")
   @get
@@ -208,7 +213,7 @@ interface AgentEndpointConversations {
 
   /**
    * Retrieves a single response from the specified conversation by its id, including its `output` items,
-   * `usage`, and status. Returns `404` when the conversation or response was not persisted (`store = false`).
+   * `usage`, and status. Returns `404` when the conversation or response was not persisted.
    */
   @summary("Get a voice agent conversation response")
   @get
@@ -233,7 +238,7 @@ interface AgentEndpointConversations {
    * Returns a paged collection of the output items produced by a specific response (the response's output
    * projection). For the complete ordered conversation history — including user input and client-created
    * tool outputs — use the conversation items route instead. Returns `404` when the conversation or
-   * response was not persisted (`store = false`).
+   * response was not persisted.
    */
   @summary("List items produced by a voice agent conversation response")
   @get
@@ -260,7 +265,7 @@ interface AgentEndpointConversations {
   /**
    * Returns a paged collection of items — the complete ordered conversation history, including user input,
    * assistant output, and client-created tool outputs (transcripts + tool events). Returns `404` when the
-   * conversation was not persisted (`store = false`).
+   * conversation was not persisted.
    */
   @summary("List items in a voice agent conversation")
   @get
@@ -285,8 +290,7 @@ interface AgentEndpointConversations {
    * Retrieves a single item from the specified conversation by its id, including its transcript. An
    * `input_audio`/`output_audio` content part indicates that audio is available for the item; the canonical per-item
    * audio metadata is the `/items/{item_id}/audio` resource, and the bytes are streamed by
-   * `/items/{item_id}/audio/content`. Returns `404` when the conversation or item was not persisted
-   * (`store = false`).
+   * `/items/{item_id}/audio/content`. Returns `404` when the conversation or item was not persisted.
    */
   @summary("Get a voice agent conversation item")
   @get
@@ -312,8 +316,8 @@ interface AgentEndpointConversations {
    * (role, format/codec, sample rate, channels, offset, duration) for both Foundry-managed and
    * bring-your-own-storage (BYOS) recordings; for BYOS the response additionally includes `blob_uri`, the URI
    * of the recording in the customer's own storage (no SAS) that the customer downloads with their own credentials.
-   * Requires the conversation to have persisted audio (`store = true`); returns `404` when the conversation,
-   * item, or its audio was not persisted.
+   * Requires the conversation to have persisted audio (effective `store = true`, or a post-call `audio` request);
+   * returns `404` when the conversation, item, or its audio was not persisted.
    */
   @summary("Get a voice agent conversation item's audio metadata")
   @get
@@ -339,7 +343,7 @@ interface AgentEndpointConversations {
    * URL). This route serves Foundry-managed storage only. For bring-your-own-storage (BYOS) recordings the
    * bytes are not proxied — the caller must download directly from customer storage using the `blob_uri`
    * returned by the item's `/audio` metadata route — so this route returns `409 Conflict` for BYOS recordings.
-   * Returns `404` when the conversation, item, or its audio was not persisted (`store = false`).
+   * Returns `404` when the conversation, item, or its audio was not persisted.
    */
   @summary("Stream a voice agent conversation item's audio")
   @get
@@ -422,7 +426,8 @@ interface AgentEndpointConversations {
    * with `error.code = recording_not_ready` and a `Retry-After` header when retry guidance is available. When the
    * conversation is `failed`, it returns terminal `409 Conflict` with `error.code = recording_unavailable`.
    * For a `completed` conversation, metadata is available subject to the existing BYOS behavior. Requires the
-   * conversation to have persisted audio (`store = true`); otherwise returns `404`.
+   * conversation to have persisted audio (effective `store = true`, or a post-call `audio` request); otherwise
+   * returns `404`.
    */
   @summary("Get a voice agent conversation's merged recording metadata")
   @get
@@ -449,7 +454,7 @@ interface AgentEndpointConversations {
    * `error.code = recording_not_ready` and a `Retry-After` header when retry guidance is available. When the
    * conversation is `failed`, it returns terminal `409 Conflict` with `error.code = recording_unavailable`.
    * For a `completed` conversation, content is available subject to the existing BYOS behavior. A conversation
-   * without persisted audio (`store = false`) returns `404`.
+   * without persisted audio (effective `store = false` and no post-call `audio` request) returns `404`.
    */
   @summary("Stream a voice agent conversation's merged recording")
   @get
